@@ -1,0 +1,34 @@
+name: PkgForge
+options:
+  bundleIdPrefix: com.vantine
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+targets:
+  PkgForge:
+    type: application
+    platform: macOS
+    sources:
+      - PkgForge
+    entitlements:
+      path: PkgForge/PkgForge.entitlements
+      properties:
+        # App Sandbox MUST stay disabled (P-2): the app execs /usr/bin/pkgbuild,
+        # /usr/bin/ditto, /usr/bin/codesign, /usr/bin/security and
+        # /usr/sbin/pkgutil, none of which a sandboxed process can spawn.
+        com.apple.security.app-sandbox: false
+    settings:
+      base:
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.vantine.PkgForge
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_STRICT_CONCURRENCY: complete
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        DEAD_CODE_STRIPPING: true
