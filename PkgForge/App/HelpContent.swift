@@ -87,7 +87,7 @@ enum HelpBook {
                 "Finds the running app by the executable path it was launched from, not by process name. Process names truncate at fifteen characters and collide between apps.",
                 "Asks the app to quit as the logged-in user, so an unsaved-document prompt appears in front of the person actually sitting there.",
                 "Polls once a second up to the quit timeout, then escalates: SIGTERM, five seconds, SIGKILL, two seconds.",
-                "Unloads any LaunchDaemon or LaunchAgent named in your cleanup lists — reading the real Label out of the plist — before that plist is deleted underneath launchd.",
+                "Unloads any LaunchDaemon or LaunchAgent named in your cleanup lists — reading the real Label out of the plist — before that plist is deleted underneath launchd. Agents are unloaded from every account's session, not just the console user's, so fast user switching does not leave one running.",
                 "Removes the existing bundle, then each stale path, each existence-checked and logged individually.",
             ]),
             .heading("If the app will not stop"),

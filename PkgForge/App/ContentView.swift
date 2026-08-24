@@ -13,11 +13,13 @@ struct ContentView: View {
     var body: some View {
         @Bindable var controller = controller
 
-        NavigationStack {
-            // The action bar is a hard sibling of the content rather than a
-            // safe-area inset: an inset lets a scroll view render its last row
-            // underneath the bar, and the inspector ignored it outright.
-            VStack(spacing: 0) {
+        // The action bar sits outside the NavigationStack, so it spans the whole
+        // window rather than the content column — with the inspector open the
+        // column is barely wider than the buttons. It is a hard sibling rather
+        // than a safe-area inset because an inset lets a scroll view render its
+        // last row underneath the bar, and the inspector ignores it outright.
+        VStack(spacing: 0) {
+            NavigationStack {
                 Group {
                     if let bundle = controller.bundle {
                         ConfigurationForm(bundle: bundle)
@@ -26,11 +28,7 @@ struct ContentView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                Divider()
-                actionBar
-            }
-            .navigationTitle("PkgForge")
+                .navigationTitle("PkgForge")
             .navigationSubtitle(controller.bundle.map { "\($0.onDiskName).app" } ?? "No application loaded")
             .toolbar {
                 ToolbarItemGroup {
@@ -58,12 +56,14 @@ struct ContentView: View {
                     .help("Show the build log")
                 }
             }
-            // Attached to the VStack so the inspector is a full-height column
-            // beside the bar, not a pane that scrolls behind it.
-            .inspector(isPresented: $isLogShown) {
-                BuildLogView()
-                    .inspectorColumnWidth(min: 300, ideal: 400, max: 700)
+                .inspector(isPresented: $isLogShown) {
+                    BuildLogView()
+                        .inspectorColumnWidth(min: 300, ideal: 400, max: 700)
+                }
             }
+
+            Divider()
+            actionBar
         }
         // I-1 / I-4 — the whole window is the target, and a replacement is
         // accepted at any point, including mid-form.
@@ -104,14 +104,25 @@ struct ContentView: View {
     private var actionBar: some View {
         HStack(spacing: 14) {
             status
+                .layoutPriority(0)
             Spacer(minLength: 12)
-            actions
+            // Fixed so the buttons keep their labels when the inspector narrows
+            // the column — the filename beside them may truncate, "Upload to
+            // Jamf Pro…" may not.
+            HStack(spacing: 10) {
+                actions
+            }
+            .fixedSize()
+            .layoutPriority(1)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(.bar)
     }
 
+    /// One line, always. The bar is only as wide as the content column, which
+    /// halves when the inspector opens — a two-line status wraps into
+    /// something unreadable long before the buttons run out of room.
     @ViewBuilder
     private var status: some View {
         switch controller.phase {
@@ -119,59 +130,62 @@ struct ContentView: View {
             Text("Drop an application to begin.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
 
         case .ready:
             if let output = controller.outputURL {
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
                     Text(output.lastPathComponent)
                         .font(.callout.weight(.medium))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Text(controller.selectedIdentity.map { "Signing with \($0.shortName)" } ?? "Unsigned package")
-                        .font(.caption)
+                    // Negative priority: this is the first thing to go when
+                    // space runs short, and the least missed.
+                    Text("· \(controller.selectedIdentity.map { "signing with \($0.shortName)" } ?? "unsigned")")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .layoutPriority(-1)
                 }
             }
 
         case .building(let fraction, let step):
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 ProgressView(value: fraction)
                     .progressViewStyle(.linear)
-                    .frame(width: 160)
+                    .frame(width: 120)
                 Text(step)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .layoutPriority(-1)
             }
 
         case .finished(let outcome):
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(outcome.packageURL.lastPathComponent)
-                        .font(.callout.weight(.medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Text("\(ByteCountFormatter.string(fromByteCount: outcome.byteCount, countStyle: .file)) · \(outcome.isSigned ? "signed" : "unsigned")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } icon: {
+            HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                Text(outcome.packageURL.lastPathComponent)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text("· \(ByteCountFormatter.string(fromByteCount: outcome.byteCount, countStyle: .file)) · \(outcome.isSigned ? "signed" : "unsigned")")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .layoutPriority(-1)
             }
 
         case .failed(let message):
-            Label {
-                Text(message)
-                    .font(.callout)
-                    .lineLimit(2)
-                    .textSelection(.enabled)
-            } icon: {
+            HStack(spacing: 6) {
                 Image(systemName: "xmark.octagon.fill")
                     .foregroundStyle(.red)
+                Text(message)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(message)
             }
-            .frame(maxWidth: 420, alignment: .leading)
         }
     }
 

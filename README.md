@@ -217,8 +217,12 @@ from the filename):
 | 11. Apostrophe + space produce valid bash | ✅ (`bash -n`, plus execution) |
 
 Tests 5 (signed), 6 and 8 need a test Mac and a Developer ID Installer identity
-to finish end to end. The Jamf upload path is written against the documented
-API and has not been exercised against a live server.
+to finish end to end.
+
+The Jamf Pro upload has been run successfully against a live server, so the
+package record fields and the upload endpoint are confirmed. Not yet exercised
+there: the rollback path when an upload fails partway, and cancelling an upload
+in flight.
 
 ## Not implemented
 
@@ -226,3 +230,7 @@ Out of scope per section 10 and left that way: notarization/stapling of the
 *output* package, `productbuild` distribution packages, end-user prompting UI,
 and signing the `.app` itself. Queueing several dropped bundles (I-5, MAY) is
 not implemented; extra items in a multi-drop are ignored with a notice.
+
+Known gaps: `--sign` has never actually run here (no Developer ID Installer
+identity on the build machine), no package has been installed as root on a test
+Mac, and VoiceOver/keyboard navigation has not been checked.
