@@ -24,7 +24,8 @@ struct HelpTopic: Identifiable, Hashable {
 
 enum HelpBook {
     static let topics: [HelpTopic] = [
-        gettingStarted, reading, scripts, cleanup, additionalScripts, signing, jamf, profiles, troubleshooting
+        gettingStarted, reading, scripts, cleanup, additionalScripts, signing, jamf, profiles,
+        troubleshooting, license,
     ]
 
     static func topic(id: String) -> HelpTopic {
@@ -239,6 +240,20 @@ enum HelpBook {
             .paragraph("Drop the same app again — a new version, months later — and everything comes back from that profile. Only the version is taken from the new bundle, because that is the one thing that genuinely changed."),
             .paragraph("Cleanup lists, install location, quit timeout, signing identity, output folder, your script additions and the Jamf metadata from the last upload all persist. Settings → Profiles lists them and deletes the ones you no longer want."),
             .note("A profile that names a signing identity no longer in your keychain quietly falls back to unsigned rather than failing the build."),
+        ]
+    )
+
+    static let license = HelpTopic(
+        id: "license",
+        title: "License",
+        symbol: "scroll",
+        summary: "Apache-2.0, copyright Vantine Imaging LLC.",
+        blocks: [
+            .paragraph("PkgForge is copyright 2026 Vantine Imaging LLC and licensed under the Apache License, Version 2.0."),
+            .paragraph("You may use, modify and redistribute it, including commercially, provided you keep the copyright and licence notices and state any changes you make. It comes with no warranty of any kind."),
+            .code("https://github.com/Vantine-Imaging/PkgForge"),
+            .paragraph("The full licence text and the attribution notice are in the LICENSE and NOTICE files in that repository."),
+            .note("It was written at Vantine Imaging LLC and is owned by it. It is public because the problem it solves is one every Mac admin has."),
         ]
     )
 

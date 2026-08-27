@@ -24,6 +24,7 @@ struct HelpMenuItems: View {
         Button("Signing") { open(HelpBook.signing.id) }
         Button("Connecting to Jamf Pro") { open(HelpBook.jamf.id) }
         Button("Troubleshooting") { open(HelpBook.troubleshooting.id) }
+        Button("License") { open(HelpBook.license.id) }
 
         Divider()
 
