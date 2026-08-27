@@ -61,9 +61,22 @@ struct ConfigurationForm: View {
                     if !controller.installerIdentities.isEmpty {
                         Divider()
                         ForEach(controller.installerIdentities) { identity in
-                            Text(identity.shortName).tag(String?.some(identity.sha1))
+                            Text(identity.menuLabel).tag(String?.some(identity.sha1))
                         }
                     }
+                }
+
+                if let selected = controller.selectedIdentity, selected.isExpiringSoon {
+                    Label(
+                        selected.daysUntilExpiry.map { days in
+                            days <= 0
+                                ? "This certificate has expired. Packages signed with it will not install."
+                                : "This certificate expires in \(days) day\(days == 1 ? "" : "s")."
+                        } ?? "This certificate expires soon.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
                 }
 
                 if controller.installerIdentities.isEmpty {

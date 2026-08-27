@@ -16,11 +16,55 @@ APP_NAME="PkgForge"
 IDENTIFIER="com.vantine.PkgForge"
 NOTARY_PROFILE="${NOTARY_PROFILE:-pkgforge-notary}"
 
+# Resolves a signing identity to its SHA-1 fingerprint, preferring the one that
+# expires last.
+#
+# Signing by common name breaks the moment a team reissues a certificate: both
+# are in the keychain with identical names and codesign refuses the ambiguous
+# match outright. Fingerprints are unique.
+newest_identity() {
+  local prefix="$1"
+  local -a shas
+  shas=(${(f)"$(security find-identity -v -p basic 2>/dev/null \
+    | grep "\"$prefix" | awk '{print $2}')"})
+  (( ${#shas} )) || return 1
+
+  local tmp best_sha="" best_epoch=0 sha enddate epoch
+  tmp=$(mktemp -d)
+  security find-certificate -c "$prefix" -a -Z -p > "$tmp/all" 2>/dev/null
+
+  for sha in $shas; do
+    awk -v want="$sha" '
+      /^SHA-1 hash:/ { hash = $3 }
+      /-----BEGIN CERTIFICATE-----/, /-----END CERTIFICATE-----/ { if (hash == want) print }
+    ' "$tmp/all" > "$tmp/cert.pem"
+    [[ -s "$tmp/cert.pem" ]] || continue
+    enddate=$(openssl x509 -in "$tmp/cert.pem" -noout -enddate 2>/dev/null | cut -d= -f2)
+    epoch=$(date -j -f "%b %e %H:%M:%S %Y %Z" "$enddate" +%s 2>/dev/null) || continue
+    if (( epoch > best_epoch )); then
+      best_epoch=$epoch
+      best_sha=$sha
+    fi
+  done
+  rm -rf "$tmp"
+
+  [[ -n "$best_sha" ]] || return 1
+  print -r -- "$best_sha"
+  if (( ${#shas} > 1 )); then
+    print -r -- "    NOTE: ${#shas} \"$prefix\" certificates in the keychain;" >&2
+    print -r -- "    using the one expiring $(date -r $best_epoch '+%Y-%m-%d')." >&2
+  fi
+}
+
+describe_identity() {
+  security find-identity -v -p basic 2>/dev/null | grep "$1" \
+    | sed -E 's/.*"(.*)"/\1/' | head -1
+}
+
 echo "==> Generating Xcode project"
 xcodegen generate
 
-APP_SIGN_ID=$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"') || true
+APP_SIGN_ID=$(newest_identity "Developer ID Application") || true
 
 rm -rf build
 mkdir -p build
@@ -28,7 +72,8 @@ BUILD_LOG="build/xcodebuild.log"
 
 sign_args=()
 if [[ -n "${APP_SIGN_ID:-}" ]]; then
-  echo "==> Building Release (signing with: $APP_SIGN_ID)"
+  echo "==> Building Release (signing with: $(describe_identity "$APP_SIGN_ID"))"
+  echo "    fingerprint: $APP_SIGN_ID"
   sign_args=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=$APP_SIGN_ID" OTHER_CODE_SIGN_FLAGS=--timestamp)
 else
   echo "==> Building Release (ad-hoc signing)"
@@ -66,11 +111,11 @@ echo "==> Building $PKG"
 pkgbuild --component "$APP_PATH" --install-location /Applications \
   --identifier "$IDENTIFIER" --version "$VERSION" "$PKG"
 
-INSTALLER_SIGN_ID=$(security find-identity -v 2>/dev/null \
-  | grep -o '"Developer ID Installer: [^"]*"' | head -1 | tr -d '"') || true
+INSTALLER_SIGN_ID=$(newest_identity "Developer ID Installer") || true
 
 if [[ -n "${INSTALLER_SIGN_ID:-}" ]]; then
-  echo "==> Signing pkg with: $INSTALLER_SIGN_ID"
+  echo "==> Signing pkg with: $(describe_identity "$INSTALLER_SIGN_ID")"
+  echo "    fingerprint: $INSTALLER_SIGN_ID"
   productsign --sign "$INSTALLER_SIGN_ID" "$PKG" "$PKG.signed"
   mv "$PKG.signed" "$PKG"
 
