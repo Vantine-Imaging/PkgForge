@@ -72,20 +72,77 @@ final class JamfUploadModel {
         return "\(formatter.string(fromByteCount: sent)) of \(formatter.string(fromByteCount: total))"
     }
 
-    func prepare(for packageURL: URL, bundle: AppBundle?, configuration: PackageConfiguration?, remembered: JamfPackageMetadata?) {
+    func prepare(
+        for packageURL: URL,
+        bundle: AppBundle?,
+        configuration: PackageConfiguration?,
+        remembered: JamfPackageMetadata?,
+        previousVersion: String? = nil
+    ) {
         self.packageURL = packageURL
         var starting = remembered ?? JamfPackageMetadata()
         starting.fileName = packageURL.lastPathComponent
+
         if starting.displayName.isEmpty || remembered == nil {
             if let bundle, let configuration {
                 starting.displayName = "\(bundle.displayName) \(configuration.version)"
             } else {
                 starting.displayName = packageURL.deletingPathExtension().lastPathComponent
             }
+        } else {
+            // The filename was refreshed above; the display name has to follow,
+            // or a new version uploads into a record still named for the old one.
+            starting.displayName = Self.reversioned(
+                starting.displayName,
+                appName: bundle?.displayName,
+                from: previousVersion,
+                to: configuration?.version
+            )
         }
+
         metadata = starting
         phase = .editing
         duplicate = nil
+    }
+
+    /// Carries a remembered display name forward to a new version.
+    ///
+    /// The name belongs to the operator — it may be "Thea 2.13.1", or
+    /// "Thea 2.13.1 (Photo Team)", or something with no version in it at all.
+    /// Regenerating it outright would throw away a deliberate rename; leaving it
+    /// alone shipped 2.13.2 into a record still called "Thea 2.13.1".
+    ///
+    /// So: when the name is exactly what PkgForge generated last time, it is
+    /// regenerated. Otherwise the version is substituted only where it stands as
+    /// its own token, which leaves a version that happens to be a substring of a
+    /// word — an app called "Studio 3" — intact.
+    static func reversioned(
+        _ displayName: String,
+        appName: String?,
+        from old: String?,
+        to new: String?
+    ) -> String {
+        guard let old, let new, !old.isEmpty, !new.isEmpty, old != new else { return displayName }
+
+        if let appName, displayName == "\(appName) \(old)" {
+            return "\(appName) \(new)"
+        }
+
+        var result = ""
+        var cursor = displayName.startIndex
+        while let match = displayName.range(of: old, range: cursor..<displayName.endIndex) {
+            let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber }
+            let precededByWord = match.lowerBound > displayName.startIndex
+                && isWord(displayName[displayName.index(before: match.lowerBound)])
+            let followedByWord = match.upperBound < displayName.endIndex
+                && isWord(displayName[match.upperBound])
+
+            result += displayName[cursor..<match.lowerBound]
+            result += (precededByWord || followedByWord) ? old : new
+            cursor = match.upperBound
+        }
+        result += displayName[cursor...]
+        return result
     }
 
     /// Looks for a same-named package before offering to upload, so a repeat

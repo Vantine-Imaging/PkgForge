@@ -55,7 +55,8 @@ struct JamfUploadSheet: View {
                 for: packageURL,
                 bundle: controller.bundle,
                 configuration: controller.configuration,
-                remembered: controller.savedJamfMetadata
+                remembered: controller.savedJamfMetadata,
+                previousVersion: controller.loadedProfileVersion
             )
             selectedServerID = jamf.preferredServer?.id
             if let server = selectedServer, jamf.hasStoredSecret(for: server), !jamf.status.isConnected {
