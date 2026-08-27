@@ -22,6 +22,27 @@ final class JamfUploadModel {
     /// When true, the existing record is updated instead of a new one created.
     var replaceExisting = true
 
+    /// True when the existing record shares this upload's display name. Jamf Pro
+    /// will not accept a second record with the same name, so "create a new
+    /// record" is not an option until the name is changed.
+    var duplicatesDisplayName: Bool {
+        guard let duplicate else { return false }
+        return duplicate.packageName == metadata.displayName
+    }
+
+    /// True when a record matched but points at a different file — replacing it
+    /// repoints it at this package.
+    var duplicatePointsElsewhere: Bool {
+        guard let duplicate else { return false }
+        return duplicate.fileName != metadata.fileName
+    }
+
+    var canUpload: Bool {
+        guard !metadata.displayName.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        if duplicatesDisplayName && !replaceExisting { return false }
+        return true
+    }
+
     private(set) var packageURL: URL?
     /// Set when the file uploaded but something non-essential did not, e.g. the
     /// metadata update on a replaced record.
@@ -69,7 +90,10 @@ final class JamfUploadModel {
     func checkForDuplicate(using client: JamfClient) async {
         phase = .checkingForDuplicate
         do {
-            duplicate = try await client.existingPackage(fileName: metadata.fileName)
+            duplicate = try await client.existingPackage(
+                fileName: metadata.fileName,
+                packageName: metadata.displayName
+            )
         } catch {
             duplicate = nil
         }

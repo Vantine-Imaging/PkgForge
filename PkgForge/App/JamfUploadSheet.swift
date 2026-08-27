@@ -173,6 +173,8 @@ struct JamfUploadSheet: View {
                 TextField("Display Name", text: $model.metadata.displayName)
                     .textFieldStyle(.roundedBorder)
                     .labelsHidden()
+                    // Editing the name changes what it might collide with.
+                    .onSubmit { Task { await refreshDuplicate() } }
             }
             LabeledContent("Filename") {
                 Text(model.metadata.fileName)
@@ -220,10 +222,13 @@ struct JamfUploadSheet: View {
 
             if let duplicate = model.duplicate {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label(
-                        "\(duplicate.fileName) already exists on this server as “\(duplicate.packageName)” (id \(duplicate.id)).",
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
+                    Label {
+                        Text(model.duplicatePointsElsewhere
+                             ? "A package record named “\(duplicate.packageName)” (id \(duplicate.id)) already exists, pointing at \(duplicate.fileName). Replacing it repoints it at this package."
+                             : "\(duplicate.fileName) already exists on this server as “\(duplicate.packageName)” (id \(duplicate.id)).")
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                    }
                     .font(.callout)
                     .foregroundStyle(.orange)
 
@@ -233,6 +238,15 @@ struct JamfUploadSheet: View {
                     }
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
+
+                    if model.duplicatesDisplayName && !model.replaceExisting {
+                        Label(
+                            "Jamf Pro requires package display names to be unique, so a second record needs a different display name.",
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    }
                 }
                 .padding(.vertical, 4)
             }
@@ -323,7 +337,7 @@ struct JamfUploadSheet: View {
                 }
                 .buttonStyle(.glassProminent)
                 .keyboardShortcut(.defaultAction)
-                .disabled(!isConnectedToSelection || model.isBusy || model.metadata.displayName.isEmpty)
+                .disabled(!isConnectedToSelection || model.isBusy || !model.canUpload)
             }
         }
         .padding(16)

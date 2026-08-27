@@ -9,6 +9,8 @@ enum JamfError: LocalizedError {
     /// Wraps another error with the step it happened in, so a 400 is
     /// attributable to creating the record, updating it, or the upload itself.
     case step(String, underlying: any Error)
+    /// A 4xx whose body Jamf Pro filled in with field-level detail.
+    case apiError(statusCode: Int, details: [JamfAPIError.Detail], body: String)
 
     var errorDescription: String? {
         switch self {
@@ -25,6 +27,14 @@ enum JamfError: LocalizedError {
             "Could not read the server response: \(detail)"
         case .step(let step, let underlying):
             "While \(step): \(underlying.localizedDescription)"
+        case .apiError(let statusCode, let details, let body):
+            """
+            Jamf Pro rejected the request (HTTP \(statusCode)).
+
+            \(details.map { "• " + $0.readable }.joined(separator: "\n"))
+
+            \(body)
+            """
         case .uploadUnsupported(let version):
             """
             This Jamf Pro (\(version)) does not offer the package upload \
@@ -33,6 +43,36 @@ enum JamfError: LocalizedError {
             """
         }
     }
+}
+
+/// Jamf Pro's error envelope. Worth decoding rather than dumping: `field` and
+/// `code` say precisely what it objected to.
+struct JamfAPIError: Decodable, Sendable {
+    struct Detail: Decodable, Sendable {
+        let code: String?
+        let description: String?
+        let field: String?
+
+        /// A sentence an operator can act on, where the code is one we know.
+        var readable: String {
+            switch code {
+            case "DUPLICATE_FIELD" where field == "packageName":
+                return "A package with this display name already exists. Jamf Pro requires package display names to be unique."
+            case "DUPLICATE_FIELD" where field == "fileName":
+                return "A package with this filename already exists on this server."
+            case "DUPLICATE_FIELD":
+                return "“\(field ?? "A field")” duplicates an existing record."
+            case "REQUIRED_FIELD", "FIELD_REQUIRED":
+                return "“\(field ?? "A field")” is required and was not sent."
+            default:
+                let what = [field, description].compactMap { $0 }.joined(separator: ": ")
+                return what.isEmpty ? (code ?? "Unspecified error") : what
+            }
+        }
+    }
+
+    let httpStatus: Int?
+    let errors: [Detail]
 }
 
 struct JamfCategory: Identifiable, Hashable, Sendable, Decodable {
@@ -261,7 +301,11 @@ actor JamfClient {
             )
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw JamfError.httpError(statusCode: http.statusCode, body: String(decoding: data, as: UTF8.self))
+            let body = String(decoding: data, as: UTF8.self)
+            if let parsed = try? JSONDecoder().decode(JamfAPIError.self, from: data), !parsed.errors.isEmpty {
+                throw JamfError.apiError(statusCode: http.statusCode, details: parsed.errors, body: body)
+            }
+            throw JamfError.httpError(statusCode: http.statusCode, body: body)
         }
         return data
     }
@@ -292,22 +336,54 @@ actor JamfClient {
 
     // MARK: - Packages
 
-    /// Looks for an existing record with the same filename, so a re-upload can
-    /// replace it instead of quietly creating a duplicate.
-    func existingPackage(fileName: String) async throws -> JamfPackageSummary? {
+    /// Looks for a record this upload would collide with.
+    ///
+    /// Both fields matter, for different reasons: a matching **fileName** means
+    /// the same package is already there, and a matching **packageName** is a
+    /// hard constraint — Jamf Pro requires display names to be unique and
+    /// rejects the POST with DUPLICATE_FIELD otherwise. Checking only the
+    /// filename let that rejection through.
+    func existingPackage(fileName: String, packageName: String) async throws -> JamfPackageSummary? {
+        if !fileName.isEmpty,
+           let match = try await firstPackage(
+               field: "fileName", value: fileName, where: { $0.fileName == fileName }
+           ) {
+            return match
+        }
+        if !packageName.isEmpty {
+            return try await firstPackage(
+                field: "packageName", value: packageName, where: { $0.packageName == packageName }
+            )
+        }
+        return nil
+    }
+
+    private func firstPackage(
+        field: String,
+        value: String,
+        where matches: (JamfPackageSummary) -> Bool
+    ) async throws -> JamfPackageSummary? {
+        // RSQL string literals are double-quoted, so an embedded quote or
+        // backslash has to be escaped or the filter is malformed.
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+
         let data = try await send(
             method: "GET",
             path: "api/v1/packages",
             queryItems: [
                 URLQueryItem(name: "page", value: "0"),
                 URLQueryItem(name: "page-size", value: "20"),
-                URLQueryItem(name: "filter", value: "fileName==\"\(fileName)\""),
+                URLQueryItem(name: "filter", value: "\(field)==\"\(escaped)\""),
             ]
         )
         guard let page = try? JSONDecoder().decode(Page<JamfPackageSummary>.self, from: data) else {
             return nil
         }
-        return page.results.first { $0.fileName == fileName }
+        // The server-side filter is trusted but re-checked: a filter Jamf
+        // ignores would otherwise hand back an unrelated package.
+        return page.results.first(where: matches)
     }
 
     private struct CreatedPackage: Decodable {

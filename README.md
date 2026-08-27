@@ -192,6 +192,18 @@ multipart body is staged to a temp file and streamed from disk, so a
 multi-gigabyte package is not held in memory, and a SHA-256 computed during
 that pass is sent with the record. Progress is reported live.
 
+Collisions are checked on **both** `fileName` and `packageName` before
+anything is sent. The second one is a hard constraint: Jamf Pro requires
+package display names to be unique and rejects the POST with
+`DUPLICATE_FIELD` otherwise, so checking only the filename let that rejection
+through as a raw HTTP 400. When a collision exists you get the choice to
+replace that record or create a new one — and creating a new one is blocked
+until the display name differs, because the server would refuse it.
+
+Jamf Pro's error envelope is decoded rather than dumped: `code` and `field`
+become a sentence you can act on, with the raw body kept underneath it for
+copying.
+
 **This needs Jamf Pro 11.5 or later**, with a cloud distribution point as the
 principal DP. Older instances have no upload endpoint; you get a clear error
 rather than a hang. Any 4xx from Jamf is surfaced with the server's own
