@@ -19,8 +19,12 @@ targets:
         com.apple.security.app-sandbox: false
     settings:
       base:
-        MARKETING_VERSION: 1.1.2
-        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.1.3
+        # Build number: monotonically increasing, never reused — Apple requires
+        # CFBundleVersion to increase for every build it sees, and updaters
+        # compare on it. Set from `git rev-list --count HEAD` when bumping, so
+        # there is a mechanical way to get the next one right.
+        CURRENT_PROJECT_VERSION: 16
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: com.vantine.PkgForge

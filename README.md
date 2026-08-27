@@ -18,6 +18,19 @@ open PkgForge.xcodeproj
 `project.yml` is the source of truth; the `.xcodeproj` is generated and
 gitignored.
 
+### Versioning
+
+Two numbers, and both move together:
+
+- `MARKETING_VERSION` → `CFBundleShortVersionString`, the version people read.
+- `CURRENT_PROJECT_VERSION` → `CFBundleVersion`, the build number. It must
+  increase for every build Apple's notary service or an updater ever sees, and
+  must never be reused. Set it from `git rev-list --count HEAD` when bumping,
+  so getting the next one right is mechanical rather than remembered.
+
+It was stuck at `1` for the first seven versions, which made seven distinct
+builds indistinguishable to anything comparing on `CFBundleVersion`.
+
 Releases are built by PkgForge itself: build the Release configuration in
 Xcode, drop the resulting `PkgForge.app` onto PkgForge, pick a Developer ID
 Installer identity, tick notarization, and build. The package attached to a
