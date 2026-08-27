@@ -16,17 +16,23 @@ open PkgForge.xcodeproj
 ```
 
 `project.yml` is the source of truth; the `.xcodeproj` is generated and
-gitignored. `scripts/release.sh` produces a distributable `.pkg` in `dist/`,
-signing with whatever Developer ID identities are in the keychain and
-notarizing too if a `notarytool` keychain profile exists.
+gitignored.
+
+Releases are built by PkgForge itself: build the Release configuration in
+Xcode, drop the resulting `PkgForge.app` onto PkgForge, pick a Developer ID
+Installer identity, tick notarization, and build. The package attached to a
+release is made exactly the way any other package it produces is — which is
+also the most direct test the thing works.
 
 ### App Sandbox is off, deliberately
 
 PkgForge shells out to `/usr/bin/pkgbuild`, `/usr/bin/ditto`,
 `/usr/bin/codesign`, `/usr/bin/security` and `/usr/sbin/pkgutil`. A sandboxed
-process cannot exec any of them, so the entitlement is `false` and
-`scripts/release.sh` fails the release if a build ever comes out sandboxed.
-Hardened Runtime stays on.
+process cannot exec any of them, so `PkgForge.entitlements` sets it to
+`false`. Hardened Runtime stays on.
+
+That entitlement is the one thing about this project that must not regress: a
+sandboxed build launches, looks fine, and fails to build anything.
 
 ## What it does
 
@@ -154,9 +160,7 @@ Developer ID Installer: Example Corp (AB12CD34EF): ambiguous
 
 The picker therefore labels each identity with its expiry date — the only thing
 telling two certificates for the same team apart — sorts the longest-lived
-first, and flags one within 90 days of expiry. `scripts/release.sh` resolves
-identities the same way, preferring the certificate that expires last rather
-than whichever the keychain happened to list first.
+first, and flags one within 90 days of expiry.
 
 Signing at all is optional: a package Jamf installs as root deploys fine
 unsigned, because an MDM-driven install does not consult Gatekeeper. It matters
@@ -172,8 +176,7 @@ such an app can be signed and can never be notarized.
 
 PkgForge reads the dropped bundle's entitlements and says so up front: a
 warning normally, a blocking error when notarization is on. It also checks for
-Hardened Runtime, which notarization equally requires. `scripts/release.sh`
-refuses to ship a release carrying either fault.
+Hardened Runtime, which notarization equally requires.
 
 ## Notarization
 
