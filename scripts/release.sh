@@ -1,4 +1,8 @@
 #!/bin/zsh
+#
+# Copyright 2026 Vantine Imaging LLC
+# SPDX-License-Identifier: Apache-2.0
+#
 # Builds a Release .pkg of PkgForge itself into dist/.
 #
 # With no signing certificates installed, produces an ad-hoc-signed app in an

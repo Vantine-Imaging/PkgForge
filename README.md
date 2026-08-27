@@ -345,3 +345,23 @@ profile.
 Deliberately not attempted: `productbuild` distribution packages, end-user
 prompting UI (that belongs in a Jamf Files and Processes payload, not in the
 package), and signing the `.app` itself — PkgForge packages what it is given.
+
+## License
+
+Copyright 2026 Vantine Imaging LLC.
+
+Licensed under the [Apache License, Version 2.0](LICENSE). You may use, modify
+and redistribute this, including commercially, provided you keep the copyright
+and license notices and state any changes you make. It is provided without
+warranty of any kind. See [NOTICE](NOTICE) for the attribution notice that
+accompanies redistribution.
+
+PkgForge was written at Vantine Imaging LLC and is owned by it; it is published
+here because the problem it solves is one every Mac admin has.
+
+### Contributing
+
+Issues and pull requests are welcome. Contributions are accepted under the
+terms of the Apache License 2.0 — per section 5 of the licence, anything you
+deliberately submit for inclusion is licensed under it without additional
+terms.

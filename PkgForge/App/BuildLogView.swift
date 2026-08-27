@@ -1,3 +1,6 @@
+// Copyright 2026 Vantine Imaging LLC
+// SPDX-License-Identifier: Apache-2.0
+
 import SwiftUI
 
 /// Live tool output (B-6). `pkgbuild` and `codesign` are streamed in as they
