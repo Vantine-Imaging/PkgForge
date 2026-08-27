@@ -6,6 +6,9 @@ enum JamfError: LocalizedError {
     case httpError(statusCode: Int, body: String)
     case decodingFailed(String)
     case uploadUnsupported(String)
+    /// Wraps another error with the step it happened in, so a 400 is
+    /// attributable to creating the record, updating it, or the upload itself.
+    case step(String, underlying: any Error)
 
     var errorDescription: String? {
         switch self {
@@ -14,9 +17,14 @@ enum JamfError: LocalizedError {
         case .authenticationFailed(let detail):
             "Authentication failed: \(detail)"
         case .httpError(let statusCode, let body):
-            "Jamf Pro returned HTTP \(statusCode). \(body.prefix(500))"
+            // Verbatim and untruncated: for a 400 the `errors` array names the
+            // offending field, and that is the only useful thing in the whole
+            // response.
+            "Jamf Pro returned HTTP \(statusCode).\n\n\(body)"
         case .decodingFailed(let detail):
             "Could not read the server response: \(detail)"
+        case .step(let step, let underlying):
+            "While \(step): \(underlying.localizedDescription)"
         case .uploadUnsupported(let version):
             """
             This Jamf Pro (\(version)) does not offer the package upload \
@@ -321,7 +329,11 @@ actor JamfClient {
     }
 
     func updatePackage(id: String, metadata: JamfPackageMetadata, sha256: String?) async throws {
-        let body = try JSONSerialization.data(withJSONObject: metadata.requestBody(sha256: sha256))
+        var object = metadata.requestBody(sha256: sha256)
+        // A PUT replaces the whole object, and the Jamf Pro API expects the id
+        // to be part of it.
+        object["id"] = id
+        let body = try JSONSerialization.data(withJSONObject: object)
         try await send(
             method: "PUT",
             path: "api/v1/packages/\(id)",

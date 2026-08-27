@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Uploads the finished package to a saved Jamf Pro instance.
@@ -261,13 +262,38 @@ struct JamfUploadSheet: View {
                         .monospacedDigit()
                 }
             case .finished(let packageID):
-                Label("Uploaded as package \(packageID)", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                VStack(alignment: .leading, spacing: 3) {
+                    Label("Uploaded as package \(packageID)", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    if let warning = model.warning {
+                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .lineLimit(3)
+                            .textSelection(.enabled)
+                    }
+                }
             case .failed(let message):
-                Label(message, systemImage: "xmark.octagon.fill")
-                    .foregroundStyle(.red)
-                    .lineLimit(3)
-                    .textSelection(.enabled)
+                // Scrolls rather than clips: Jamf's 400 body is where the
+                // offending field is named, and it is several lines long.
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "xmark.octagon.fill")
+                        .foregroundStyle(.red)
+                    ScrollView {
+                        Text(message)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 96)
+                    Button("Copy", systemImage: "doc.on.doc") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(message, forType: .string)
+                    }
+                    .buttonStyle(.borderless)
+                    .labelStyle(.iconOnly)
+                    .help("Copy the full error")
+                }
             case .editing:
                 EmptyView()
             }

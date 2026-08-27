@@ -23,6 +23,9 @@ final class JamfUploadModel {
     var replaceExisting = true
 
     private(set) var packageURL: URL?
+    /// Set when the file uploaded but something non-essential did not, e.g. the
+    /// metadata update on a replaced record.
+    private(set) var warning: String?
     /// Set while an upload is in flight so it can be called off.
     private var uploadTask: Task<Void, Never>?
 
@@ -108,22 +111,42 @@ final class JamfUploadModel {
         // record belongs to the operator whether or not this upload works.
         var createdPackageID: String?
 
+        warning = nil
+
         do {
             let packageID: String
             if let duplicate, replaceExisting {
-                try await client.updatePackage(id: duplicate.id, metadata: metadata, sha256: prepared.sha256)
                 packageID = duplicate.id
+                // Best-effort: getting the new file onto the distribution point
+                // is the point of this operation, and a rejected metadata
+                // change should not stand in the way of it. Reported, not
+                // swallowed.
+                do {
+                    try await client.updatePackage(id: packageID, metadata: metadata, sha256: prepared.sha256)
+                } catch {
+                    warning = "The package record's details were not updated — \(error.localizedDescription)"
+                }
             } else {
-                packageID = try await client.createPackage(metadata, sha256: prepared.sha256)
+                do {
+                    packageID = try await client.createPackage(metadata, sha256: prepared.sha256)
+                } catch {
+                    throw JamfError.step("creating the package record", underlying: error)
+                }
                 createdPackageID = packageID
             }
 
             phase = .uploading(sent: 0, total: prepared.totalBytes)
-            try await client.uploadPackageFile(packageID: packageID, multipart: prepared) { [weak self] sent, total in
-                Task { @MainActor in
-                    guard let self, self.isBusy else { return }
-                    self.phase = .uploading(sent: sent, total: total > 0 ? total : prepared.totalBytes)
+            do {
+                try await client.uploadPackageFile(packageID: packageID, multipart: prepared) { [weak self] sent, total in
+                    Task { @MainActor in
+                        guard let self, self.isBusy else { return }
+                        self.phase = .uploading(sent: sent, total: total > 0 ? total : prepared.totalBytes)
+                    }
                 }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                throw JamfError.step("uploading the file", underlying: error)
             }
 
             phase = .finished(packageID: packageID)
