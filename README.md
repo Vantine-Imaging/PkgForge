@@ -4,8 +4,9 @@ Turns a dropped `.app` into a signed, Jamf-ready installer `.pkg` with
 generated pre/postinstall cleanup scripts — and, optionally, notarizes it and
 uploads it straight into Jamf Pro.
 
-macOS 26, SwiftUI, no `sudo`, no privileged helper. Built against
-`pkgforge-requirements.md`.
+macOS 26, SwiftUI, no `sudo`, no privileged helper.
+
+![PkgForge](docs/screenshot.png)
 
 ## Build and run
 
@@ -176,9 +177,8 @@ refuses to ship a release carrying either fault.
 
 ## Notarization
 
-Out of scope per section 10 of the requirements, added on request. Off by
-default, and unavailable until an installer identity is chosen — an unsigned
-package cannot be notarized.
+Off by default, and unavailable until an installer identity is chosen — an
+unsigned package cannot be notarized.
 
 It needs a `notarytool` keychain profile, created once per Mac. PkgForge cannot
 create this for you; it takes an Apple ID and an app-specific password:
@@ -203,7 +203,7 @@ signed, and still deployable via Jamf; only the notarization is missing.
 
 ## Jamf Pro upload
 
-Also out of scope per section 10, and also included because it was asked for.
+Optional. Nothing about building a package requires it.
 
 ### Saved logins
 
@@ -283,17 +283,17 @@ The Help menu also has **Show the Installer Log**, which opens this Mac's
 `/var/log/install.log` — the same file the generated scripts write to on a
 target Mac.
 
-## Two deliberate deviations from the spec
+## Two deliberate design decisions
 
-- **N-3** asks for filenames sanitised to letters, digits, hyphen and
-  underscore. Applied literally that turns `2.1.0` into `2-1-0`, which makes
-  the package unrecognisable downstream for no safety gain. The app *name* is
-  reduced to that set; the *version* additionally keeps dots. Leading dots and
-  `..` are still stripped.
-- **Section 6** does not say what postinstall should do if the bundle is not
-  where it was expected. It exits 1. Reaching that point means ownership was
-  never corrected on a bundle in `/Applications`, which is the exact
-  privilege-escalation case S-14 exists to close.
+- **Filename sanitising keeps dots in the version.** Reducing a filename to
+  letters, digits, hyphen and underscore turns `2.1.0` into `2-1-0`, which
+  makes the package unrecognisable downstream for no safety gain — a dot is
+  inert in a filename. The app *name* is reduced to that set; the *version*
+  additionally keeps dots. Leading dots and `..` are still stripped.
+- **The postinstall exits non-zero if the installed bundle is missing.**
+  Reaching that point means ownership was never corrected on a bundle in
+  `/Applications`, which is the privilege-escalation case the `chown` exists to
+  close — so it fails the policy rather than reporting success.
 
 ## Test status
 
@@ -338,9 +338,10 @@ profile.
 - No package has been installed as root on a test Mac (acceptance tests 6
   and 8).
 - Notarization has never completed successfully end to end.
-- Queueing several dropped bundles (I-5, MAY) is not implemented; extra items
-  in a multi-drop are ignored with a notice.
+- Queueing several dropped bundles is not implemented; extra items in a
+  multi-drop are ignored with a notice.
 - VoiceOver and keyboard navigation have not been checked.
 
-Still out of scope per section 10: `productbuild` distribution packages,
-end-user prompting UI, and signing the `.app` itself.
+Deliberately not attempted: `productbuild` distribution packages, end-user
+prompting UI (that belongs in a Jamf Files and Processes payload, not in the
+package), and signing the `.app` itself — PkgForge packages what it is given.
