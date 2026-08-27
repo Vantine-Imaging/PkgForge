@@ -45,6 +45,21 @@ The signing picker only lists **Developer ID Installer** identities. An
 application identity produces a package macOS refuses to install, so it must
 never be selectable.
 
+Identities are selected by **SHA-1 fingerprint, never by common name**. A team
+that has reissued a certificate has two in the keychain with identical names,
+and `codesign` refuses the ambiguous match outright:
+
+```
+Developer ID Installer: Example Corp (AB12CD34EF): ambiguous
+(matches "Developer ID Installer: …" and "Developer ID Installer: …")
+```
+
+The picker therefore labels each identity with its expiry date — the only thing
+telling two certificates for the same team apart — sorts the longest-lived
+first, and flags one within 90 days of expiry. `scripts/release.sh` resolves
+identities the same way, preferring the certificate that expires last rather
+than whichever the keychain happened to list first.
+
 **Preview Scripts** in the toolbar shows exactly what will run as root on every
 managed Mac, before you build.
 
@@ -208,7 +223,7 @@ from the filename):
 | 2. Binary `Info.plist` parses | ✅ |
 | 3. Scripts reference the on-disk filename, not the display name | ✅ |
 | 4. Non-app folder and `.dmg` rejected cleanly | ✅ |
-| 5. `pkgutil --check-signature` on unsigned build | ✅ (signed path needs an identity) |
+| 5. `pkgutil --check-signature` unsigned, then signed | ✅ both — the signed package reports a full Developer ID Installer chain with a trusted timestamp |
 | 6. Graceful quit of a running app | ✅ (executed against a sandboxed install location) |
 | 7. Escalation ladder on a `SIGSTOP`ped app | ✅ at the `SIGTERM` rung — a stopped process is still terminated by `SIGTERM`, so the `SIGKILL` rung and the `exit 1` abort could not be provoked without an unkillable process |
 | 8. Installed bundle is `root:wheel`, no quarantine | ⬜ needs a real install as root |
@@ -216,8 +231,7 @@ from the filename):
 | 10. Second build prefills saved cleanup lists | ✅ (profile round-trip) |
 | 11. Apostrophe + space produce valid bash | ✅ (`bash -n`, plus execution) |
 
-Tests 5 (signed), 6 and 8 need a test Mac and a Developer ID Installer identity
-to finish end to end.
+Tests 6 and 8 need a test Mac — they require installing as root.
 
 The Jamf Pro upload has been run successfully against a live server, so the
 package record fields and the upload endpoint are confirmed. Not yet exercised
@@ -231,6 +245,5 @@ Out of scope per section 10 and left that way: notarization/stapling of the
 and signing the `.app` itself. Queueing several dropped bundles (I-5, MAY) is
 not implemented; extra items in a multi-drop are ignored with a notice.
 
-Known gaps: `--sign` has never actually run here (no Developer ID Installer
-identity on the build machine), no package has been installed as root on a test
-Mac, and VoiceOver/keyboard navigation has not been checked.
+Known gaps: no package has been installed as root on a test Mac, and
+VoiceOver/keyboard navigation has not been checked.
