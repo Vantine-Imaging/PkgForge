@@ -282,9 +282,29 @@ final class BuildController {
         return profiles.profile(for: bundle.bundleIdentifier)?.jamfMetadata
     }
 
+    /// The version the remembered Jamf metadata was captured at.
+    ///
+    /// Deliberately not `configuration.version` from the profile: that moves on
+    /// every successful build, while an upload happens less often, so using it
+    /// silently compared a version against itself.
+    var savedJamfMetadataVersion: String? {
+        guard let bundle, let profile = profiles.profile(for: bundle.bundleIdentifier) else { return nil }
+        if let recorded = profile.jamfMetadataVersion, !recorded.isEmpty {
+            return recorded
+        }
+        // Profiles written before that was recorded: the remembered filename is
+        // one PkgForge generated, so the version is still in it.
+        guard let fileName = profile.jamfMetadata?.fileName else { return nil }
+        return PackageBuilder.version(fromPackageFileName: fileName, bundle: bundle)
+    }
+
     func rememberJamfMetadata(_ metadata: JamfPackageMetadata) {
         guard let bundle else { return }
-        profiles.recordJamfMetadata(metadata, for: bundle.bundleIdentifier)
+        profiles.recordJamfMetadata(
+            metadata,
+            version: configuration.version,
+            for: bundle.bundleIdentifier
+        )
     }
 
     // MARK: Building

@@ -116,6 +116,24 @@ enum PackageBuilder {
         return "\(name)-\(cleanVersion).pkg"
     }
 
+    /// The filename stem PkgForge would use for this bundle, i.e. everything
+    /// before the `-<version>.pkg`. Lets a version be recovered from a filename
+    /// PkgForge generated earlier.
+    static func packageNameStem(for bundle: AppBundle) -> String {
+        sanitize(bundle.onDiskName)
+    }
+
+    /// Recovers the version from a filename this app produced, or nil if the
+    /// name does not have the expected shape.
+    static func version(fromPackageFileName fileName: String, bundle: AppBundle) -> String? {
+        let stem = packageNameStem(for: bundle)
+        guard fileName.hasSuffix(".pkg") else { return nil }
+        let base = String(fileName.dropLast(".pkg".count))
+        guard base.hasPrefix(stem + "-") else { return nil }
+        let version = String(base.dropFirst(stem.count + 1))
+        return version.isEmpty ? nil : version
+    }
+
     private static func sanitize(_ value: String, keepingDots: Bool = false) -> String {
         let extra = keepingDots ? "-_." : "-_"
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: extra))
