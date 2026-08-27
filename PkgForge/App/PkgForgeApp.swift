@@ -6,6 +6,7 @@ struct PkgForgeApp: App {
     @State private var defaults: DefaultsStore
     @State private var jamf = JamfSession()
     @State private var help = HelpNavigator()
+    @State private var settingsNavigator = SettingsNavigator()
     @State private var controller: BuildController
 
     init() {
@@ -26,6 +27,7 @@ struct PkgForgeApp: App {
                 .environment(jamf)
                 .environment(help)
                 .environment(defaults)
+                .environment(settingsNavigator)
                 // P-5 — single window, 760 × 620 floor.
                 .frame(minWidth: 760, minHeight: 620)
         }
@@ -33,7 +35,7 @@ struct PkgForgeApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .newItem) {
-                Button("Choose Application…") { controller.chooseFile() }
+                Button("Choose Application") { controller.chooseFile() }
                     .keyboardShortcut("o")
                 Divider()
                 Button("Build Package") { controller.startBuild() }
@@ -61,6 +63,8 @@ struct PkgForgeApp: App {
                 .environment(profiles)
                 .environment(jamf)
                 .environment(defaults)
+                .environment(settingsNavigator)
+                .environment(settingsNavigator)
         }
     }
 }

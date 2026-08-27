@@ -32,7 +32,7 @@ struct DropZoneView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
 
-                    Button("Choose…") { controller.chooseFile() }
+                    Button("Choose") { controller.chooseFile() }
                         .buttonStyle(.glass)
                         .controlSize(.large)
                         .padding(.top, 4)

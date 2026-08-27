@@ -2,19 +2,23 @@ import AppKit
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(SettingsNavigator.self) private var navigator
+
     var body: some View {
-        TabView {
-            Tab("General", systemImage: "gearshape") {
+        @Bindable var navigator = navigator
+
+        TabView(selection: $navigator.selection) {
+            Tab("General", systemImage: "gearshape", value: SettingsTab.general) {
                 GeneralSettings()
             }
-            Tab("Jamf Pro", systemImage: "server.rack") {
+            Tab("Jamf Pro", systemImage: "server.rack", value: SettingsTab.jamfPro) {
                 JamfServersSettings()
             }
-            Tab("Profiles", systemImage: "doc.text.magnifyingglass") {
+            Tab("Profiles", systemImage: "doc.text.magnifyingglass", value: SettingsTab.profiles) {
                 ProfilesSettings()
             }
         }
-        .frame(width: 660, height: 480)
+        .frame(width: 700, height: 520)
     }
 }
 
@@ -42,7 +46,7 @@ struct GeneralSettings: View {
                             .lineLimit(1)
                             .truncationMode(.head)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("Choose…") { chooseOutputDirectory() }
+                        Button("Choose") { chooseOutputDirectory() }
                             .buttonStyle(.glass)
                             .controlSize(.small)
                     }
@@ -121,7 +125,7 @@ struct JamfServersSettings: View {
                 } description: {
                     Text("Add a login to upload finished packages straight to Jamf Pro.")
                 } actions: {
-                    Button("Add Login…") { addServer() }
+                    Button("Add Login") { addServer() }
                         .buttonStyle(.glassProminent)
                 }
                 .frame(maxHeight: .infinity)
@@ -129,9 +133,8 @@ struct JamfServersSettings: View {
                 List(selection: $selection) {
                     ForEach(jamf.servers) { server in
                         HStack(spacing: 12) {
-                            Image(systemName: jamf.activeServerID == server.id && jamf.status.isConnected
-                                  ? "bolt.horizontal.circle.fill" : "server.rack")
-                            .foregroundStyle(jamf.activeServerID == server.id && jamf.status.isConnected ? Color.green : .secondary)
+                            Image(systemName: isLive(server) ? "bolt.horizontal.circle.fill" : "server.rack")
+                                .foregroundStyle(isLive(server) ? Color.green : .secondary)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(server.displayName)
@@ -142,7 +145,7 @@ struct JamfServersSettings: View {
                                     .lineLimit(1)
                             }
 
-                            Spacer()
+                            Spacer(minLength: 8)
 
                             if !jamf.hasStoredSecret(for: server) {
                                 Label("No secret saved", systemImage: "key.slash")
@@ -150,17 +153,31 @@ struct JamfServersSettings: View {
                                     .foregroundStyle(.orange)
                                     .help("No \(server.authMode.secretFieldLabel.lowercased()) in the keychain for this login.")
                             }
+
+                            // Spelled out rather than hidden behind a
+                            // right-click: an action nobody can see is an
+                            // action nobody uses.
+                            HStack(spacing: 6) {
+                                Button(isLive(server) ? "Connected" : "Connect") {
+                                    Task { await jamf.switchTo(server) }
+                                }
+                                .disabled(isLive(server) || !jamf.hasStoredSecret(for: server))
+
+                                Button("Edit") { edit(server) }
+
+                                Button("Remove", role: .destructive) {
+                                    if selection == server.id { selection = nil }
+                                    jamf.remove(server)
+                                }
+                            }
+                            .buttonStyle(.glass)
+                            .controlSize(.small)
+                            .fixedSize()
                         }
                         .padding(.vertical, 4)
                         .tag(server.id)
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) { edit(server) }
-                        .contextMenu {
-                            Button("Edit…") { edit(server) }
-                            Button("Connect") { Task { await jamf.switchTo(server) } }
-                            Divider()
-                            Button("Remove", role: .destructive) { jamf.remove(server) }
-                        }
                     }
                 }
                 .listStyle(.inset)
@@ -169,21 +186,9 @@ struct JamfServersSettings: View {
             Divider()
 
             HStack(spacing: 10) {
-                Button("Add", systemImage: "plus") { addServer() }
-                    .labelStyle(.iconOnly)
-                Button("Remove", systemImage: "minus") {
-                    if let server = jamf.servers.first(where: { $0.id == selection }) {
-                        jamf.remove(server)
-                        selection = nil
-                    }
-                }
-                .labelStyle(.iconOnly)
-                .disabled(selection == nil)
-
-                Button("Edit…") {
-                    if let server = jamf.servers.first(where: { $0.id == selection }) { edit(server) }
-                }
-                .disabled(selection == nil)
+                // Edit and Remove live on the rows themselves, so the only
+                // thing left down here is the one action no row can offer.
+                Button("Add Login", systemImage: "plus") { addServer() }
 
                 Spacer()
 
@@ -201,6 +206,10 @@ struct JamfServersSettings: View {
         .sheet(item: $editing) { server in
             JamfServerEditor(draft: server, isNew: isNew)
         }
+    }
+
+    private func isLive(_ server: JamfServer) -> Bool {
+        jamf.activeServerID == server.id && jamf.status.isConnected
     }
 
     private func addServer() {
@@ -353,27 +362,37 @@ struct ProfilesSettings: View {
             } else {
                 List(selection: $selection) {
                     ForEach(profiles.profiles) { profile in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(profile.appName)
                                     .font(.body.weight(.medium))
-                                Spacer()
+                                Text(profile.bundleIdentifier)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Text(summary(for: profile))
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            VStack(alignment: .trailing, spacing: 6) {
                                 Text(profile.savedAt.formatted(date: .abbreviated, time: .shortened))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                Button("Delete", role: .destructive) {
+                                    if selection == profile.bundleIdentifier { selection = nil }
+                                    profiles.delete(profile)
+                                }
+                                .buttonStyle(.glass)
+                                .controlSize(.small)
                             }
-                            Text(profile.bundleIdentifier)
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                            Text(summary(for: profile))
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                            .fixedSize()
                         }
-                        .padding(.vertical, 3)
+                        .padding(.vertical, 4)
                         .tag(profile.bundleIdentifier)
-                        .contextMenu {
-                            Button("Delete", role: .destructive) { profiles.delete(profile) }
-                        }
                     }
                 }
                 .listStyle(.inset)
@@ -382,15 +401,6 @@ struct ProfilesSettings: View {
             Divider()
 
             HStack(spacing: 10) {
-                Button("Delete", systemImage: "minus") {
-                    if let profile = profiles.profiles.first(where: { $0.bundleIdentifier == selection }) {
-                        profiles.delete(profile)
-                        selection = nil
-                    }
-                }
-                .labelStyle(.iconOnly)
-                .disabled(selection == nil)
-
                 Button("Reveal in Finder") {
                     NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: profiles.directoryPath)
                 }

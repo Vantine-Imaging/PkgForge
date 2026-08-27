@@ -32,7 +32,7 @@ struct ContentView: View {
             .navigationSubtitle(controller.bundle.map { "\($0.onDiskName).app" } ?? "No application loaded")
             .toolbar {
                 ToolbarItemGroup {
-                    Button(controller.bundle == nil ? "Choose…" : "Replace…", systemImage: "folder") {
+                    Button(controller.bundle == nil ? "Choose" : "Replace", systemImage: "folder") {
                         controller.chooseFile()
                     }
                     .help("Choose an application bundle")
@@ -211,7 +211,7 @@ struct ContentView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
 
-            Button("Upload to Jamf Pro…", systemImage: "arrow.up.circle") {
+            Button("Upload to Jamf Pro", systemImage: "arrow.up.circle") {
                 isUploadShown = true
             }
             .buttonStyle(.glassProminent)

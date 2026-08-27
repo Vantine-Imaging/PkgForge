@@ -7,6 +7,7 @@ struct JamfUploadSheet: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(BuildController.self) private var controller
     @Environment(JamfSession.self) private var jamf
+    @Environment(SettingsNavigator.self) private var settingsNavigator
 
     @State private var model = JamfUploadModel()
     @State private var selectedServerID: UUID?
@@ -91,7 +92,7 @@ struct JamfUploadSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("No saved logins yet.")
                         .foregroundStyle(.secondary)
-                    Button("Add a Jamf Pro Login…") { openSettings() }
+                    Button("Add a Jamf Pro Login") { showJamfSettings() }
                         .buttonStyle(.glass)
                 }
                 .padding(.vertical, 4)
@@ -143,7 +144,7 @@ struct JamfUploadSheet: View {
                 statusLine
             }
 
-            Button("Manage Logins…") { openSettings() }
+            Button("Manage Logins") { showJamfSettings() }
                 .buttonStyle(.link)
                 .font(.callout)
         }
@@ -344,6 +345,13 @@ struct JamfUploadSheet: View {
     }
 
     // MARK: Actions
+
+    /// Opens Settings on the Jamf Pro tab. `openSettings()` on its own reopens
+    /// whichever tab was last shown.
+    private func showJamfSettings() {
+        settingsNavigator.show(.jamfPro)
+        openSettings()
+    }
 
     private func connectIfPossible() async {
         guard let server = selectedServer else { return }

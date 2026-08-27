@@ -37,6 +37,15 @@ struct PackageConfiguration: Codable, Equatable, Sendable {
     /// postinstall has to call them.
     var extraScriptFiles: [String] = []
 
+    // MARK: Notarization
+
+    /// Submit the finished package to Apple's notary service and staple the
+    /// ticket. Requires a signed package.
+    var notarize: Bool = false
+    /// `notarytool` keychain profile name, created once with
+    /// `xcrun notarytool store-credentials`.
+    var notaryProfile: String = ""
+
     // A saved profile is a long-lived on-disk format that will keep gaining
     // fields. Synthesised decoding throws on a missing key, and ProfileStore
     // decodes with `try?` — so one new field would silently erase every
@@ -47,6 +56,7 @@ struct PackageConfiguration: Codable, Equatable, Sendable {
         case removeStrayCopies, abortIfRunning, preventRelocation
         case signingIdentitySHA1, outputDirectoryPath
         case customPreinstall, customPreinstallPlacement, customPostinstall, extraScriptFiles
+        case notarize, notaryProfile
     }
 
     init() {}
@@ -74,6 +84,8 @@ struct PackageConfiguration: Codable, Equatable, Sendable {
         customPreinstallPlacement = value(.customPreinstallPlacement, fallback.customPreinstallPlacement)
         customPostinstall = value(.customPostinstall, fallback.customPostinstall)
         extraScriptFiles = value(.extraScriptFiles, fallback.extraScriptFiles)
+        notarize = value(.notarize, fallback.notarize)
+        notaryProfile = value(.notaryProfile, fallback.notaryProfile)
     }
 
     static let defaultUserStalePaths = """
@@ -136,6 +148,10 @@ extension PackageConfiguration {
 
     var hasCustomPostinstall: Bool {
         !customPostinstall.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var trimmedNotaryProfile: String {
+        notaryProfile.trimmingCharacters(in: .whitespaces)
     }
 }
 

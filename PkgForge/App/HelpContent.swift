@@ -183,7 +183,20 @@ enum HelpBook {
             .heading("Checking the result"),
             .paragraph("Every build runs pkgutil --check-signature and puts the result in the log. On an unsigned package it reads “Status: no signature”, which is expected rather than a failure."),
             .heading("Notarization"),
-            .paragraph("Not done here, deliberately. It is unnecessary for packages installed as root by an MDM, and adds a network round trip to every build."),
+            .paragraph("Optional, and off by default. A package an MDM installs as root bypasses Gatekeeper entirely, so notarization buys nothing there. It matters for the package you double-click on a test Mac, which otherwise needs right-click-Open every time."),
+            .paragraph("It needs a notarytool keychain profile, created once per Mac. PkgForge cannot make this for you — it takes your Apple ID and an app-specific password:"),
+            .code("""
+            xcrun notarytool store-credentials pkgforge-notary \\
+              --apple-id you@example.com \\
+              --team-id ABCDE12345
+            """),
+            .paragraph("Then tick “Notarize with Apple after building”, name that profile, and press Verify — which checks the profile resolves before you spend five minutes discovering a typo. Notarization requires a signed package, so the toggle is unavailable until an installer identity is selected."),
+            .bullets([
+                "The package is submitted and PkgForge waits for a verdict, usually a few minutes.",
+                "On acceptance the ticket is stapled, then validated, and the result is logged.",
+                "On rejection the notary log is fetched and shown — the verdict alone never says what was wrong.",
+            ]),
+            .note("A notary rejection fails the build but never deletes the package. It is still built and still signed; it just is not notarized, and you can deploy it via Jamf regardless."),
         ]
     )
 

@@ -95,9 +95,55 @@ struct ConfigurationForm: View {
                             .lineLimit(1)
                             .truncationMode(.head)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("Choose…") { controller.chooseOutputDirectory() }
+                        Button("Choose") { controller.chooseOutputDirectory() }
                             .buttonStyle(.glass)
                             .controlSize(.small)
+                    }
+                }
+
+                Toggle(isOn: $controller.configuration.notarize) {
+                    Text("Notarize with Apple after building")
+                    Text(controller.selectedIdentity == nil
+                         ? "Requires a signed package — pick an installer identity above."
+                         : "Only needed for packages someone installs by hand. Jamf installs as root and bypasses Gatekeeper either way.")
+                }
+                .disabled(controller.selectedIdentity == nil)
+
+                if controller.configuration.notarize, controller.selectedIdentity != nil {
+                    LabeledContent("Notary Profile") {
+                        HStack(spacing: 8) {
+                            TextField("Profile name", text: $controller.configuration.notaryProfile)
+                                .textFieldStyle(.roundedBorder)
+                                .labelsHidden()
+                            Button("Verify") { Task { await controller.verifyNotaryProfile() } }
+                                .buttonStyle(.glass)
+                                .controlSize(.small)
+                                .disabled(controller.configuration.trimmedNotaryProfile.isEmpty)
+                        }
+                    }
+
+                    switch controller.notaryProfileState {
+                    case .checking:
+                        Label("Checking…", systemImage: "clock")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    case .valid:
+                        Label("Profile found and accepted by Apple.", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    case .invalid(let message):
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                            .textSelection(.enabled)
+                    case .unchecked:
+                        Label(
+                            "Create the profile once with: xcrun notarytool store-credentials",
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
                     }
                 }
 
@@ -238,7 +284,7 @@ struct ConfigurationForm: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Bundled files").font(.callout.weight(.medium))
                 Spacer()
-                Button("Add…") { controller.addExtraScriptFiles() }
+                Button("Add") { controller.addExtraScriptFiles() }
                     .buttonStyle(.glass)
                     .controlSize(.small)
             }

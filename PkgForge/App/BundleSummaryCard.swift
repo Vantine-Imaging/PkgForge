@@ -45,7 +45,7 @@ struct BundleSummaryRow: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .trailing, spacing: 6) {
-                Button("Replace…") { controller.chooseFile() }
+                Button("Replace") { controller.chooseFile() }
                     .buttonStyle(.glass)
                     .controlSize(.small)
                 Button("Remove") { controller.clear() }

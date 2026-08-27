@@ -252,9 +252,22 @@ in flight.
 
 ## Not implemented
 
-Out of scope per section 10 and left that way: notarization/stapling of the
-*output* package, `productbuild` distribution packages, end-user prompting UI,
-and signing the `.app` itself. Queueing several dropped bundles (I-5, MAY) is
+Notarization of the output package was out of scope per section 10 and has
+since been added on request — off by default, since a package an MDM installs
+as root bypasses Gatekeeper anyway. It needs a `notarytool` keychain profile
+created once per Mac:
+
+```bash
+xcrun notarytool store-credentials pkgforge-notary --apple-id you@example.com --team-id ABCDE12345
+```
+
+PkgForge submits, waits for a verdict, staples and validates the ticket, and on
+rejection fetches the notary log — the verdict alone never says what was wrong.
+A rejection fails the build but never deletes the package: it is still built and
+still signed, and still deployable via Jamf.
+
+Still out of scope per section 10: `productbuild` distribution packages,
+end-user prompting UI, and signing the `.app` itself. Queueing several dropped bundles (I-5, MAY) is
 not implemented; extra items in a multi-drop are ignored with a notice.
 
 Known gaps: no package has been installed as root on a test Mac, and
