@@ -161,6 +161,19 @@ Signing at all is optional: a package Jamf installs as root deploys fine
 unsigned, because an MDM-driven install does not consult Gatekeeper. It matters
 when someone might double-click the package by hand.
 
+### The payload is checked for debug builds
+
+Xcode injects `com.apple.security.get-task-allow` — the entitlement that lets a
+debugger attach — into any build with base entitlements injected, **Release
+included** unless `CODE_SIGN_INJECT_BASE_ENTITLEMENTS` is turned off. Apple's
+notary service rejects every executable carrying it, so a package built from
+such an app can be signed and can never be notarized.
+
+PkgForge reads the dropped bundle's entitlements and says so up front: a
+warning normally, a blocking error when notarization is on. It also checks for
+Hardened Runtime, which notarization equally requires. `scripts/release.sh`
+refuses to ship a release carrying either fault.
+
 ## Notarization
 
 Out of scope per section 10 of the requirements, added on request. Off by

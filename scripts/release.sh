@@ -103,6 +103,18 @@ if codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null \
 fi
 echo "    Verified: App Sandbox is disabled"
 
+# The debug entitlement is injected into any build with base entitlements
+# injected — Release included, unless CODE_SIGN_INJECT_BASE_ENTITLEMENTS is off.
+# The notary service rejects every executable carrying it, so a release built
+# with it can be signed and can never be notarized.
+if codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null     | plutil -convert xml1 -o - - 2>/dev/null     | grep -A1 'com.apple.security.get-task-allow' | grep -q '<true/>'; then
+  echo "    ERROR: the built app carries com.apple.security.get-task-allow."
+  echo "    That is a debug entitlement; Apple will refuse to notarize it."
+  echo "    Check CODE_SIGN_INJECT_BASE_ENTITLEMENTS is NO for Release."
+  exit 1
+fi
+echo "    Verified: no debug entitlement"
+
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_PATH/Contents/Info.plist")
 PKG="dist/$APP_NAME-$VERSION.pkg"
 mkdir -p dist

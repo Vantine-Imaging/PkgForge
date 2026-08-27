@@ -54,6 +54,13 @@ struct SignatureInfo: Sendable, Equatable {
     var authority: String?
     var teamIdentifier: String?
     var detail: String
+    /// `com.apple.security.get-task-allow` — the entitlement that lets a
+    /// debugger attach. Xcode injects it into any build with base entitlements
+    /// injected, Release included, and Apple's notary service rejects every
+    /// executable carrying it.
+    var hasDebugEntitlement: Bool = false
+    /// Hardened Runtime, which notarization also requires.
+    var hasHardenedRuntime: Bool = false
 }
 
 /// Payload size and file count (M-6), so a 4 GB app is obvious before the build.
@@ -126,6 +133,21 @@ enum BundleInspector {
         )
     }
 
+    /// Reads the entitlements `codesign` embedded in the bundle.
+    private static func entitlements(of url: URL) async -> [String: Any] {
+        guard let result = try? await ProcessRunner.run(
+            "/usr/bin/codesign",
+            ["-d", "--entitlements", "-", "--xml", url.path(percentEncoded: false)]
+        ), result.succeeded else { return [:] }
+
+        // codesign puts the plist on stdout and its chatter on stderr.
+        guard let data = result.standardOutput.data(using: .utf8),
+              let parsed = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let dictionary = parsed as? [String: Any]
+        else { return [:] }
+        return dictionary
+    }
+
     /// `codesign` writes its report to stderr, which is why both pipes matter.
     static func signature(of url: URL) async -> SignatureInfo {
         let result: ProcessResult
@@ -160,11 +182,19 @@ enum BundleInspector {
         // An ad-hoc signature reports no Authority line at all.
         let adHoc = lines.contains { $0.contains("Signature=adhoc") }
 
+        // `flags=0x10000(runtime)` is Hardened Runtime.
+        let hardened = lines.contains { $0.contains("flags=") && $0.contains("runtime") }
+
+        let claims = await entitlements(of: url)
+        let debuggable = (claims["com.apple.security.get-task-allow"] as? Bool) == true
+
         return SignatureInfo(
             isSigned: !adHoc && authority != nil,
             authority: adHoc ? "Ad-hoc signature" : authority,
             teamIdentifier: team,
-            detail: report.trimmingCharacters(in: .whitespacesAndNewlines)
+            detail: report.trimmingCharacters(in: .whitespacesAndNewlines),
+            hasDebugEntitlement: debuggable,
+            hasHardenedRuntime: hardened
         )
     }
 
