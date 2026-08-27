@@ -18,6 +18,10 @@ struct BuildProfile: Codable, Identifiable, Sendable, Equatable {
     var configuration: PackageConfiguration
     /// Jamf Pro package metadata from the last upload of this app.
     var jamfMetadata: JamfPackageMetadata?
+    /// The Jamf Pro package record this app was last uploaded to. Lets a new
+    /// version offer to replace that record — the record's own name and
+    /// filename change with each version, so nothing else identifies it.
+    var jamfPackageID: String?
     /// The app version that metadata was captured at. Not the same as
     /// `configuration.version`, which moves on every successful build — an
     /// upload happens less often than a build, and the remembered display name
@@ -83,6 +87,7 @@ final class ProfileStore {
             savedAt: Date(),
             configuration: configuration,
             jamfMetadata: jamfMetadata ?? existing?.jamfMetadata,
+            jamfPackageID: existing?.jamfPackageID,
             jamfMetadataVersion: existing?.jamfMetadataVersion
         )
         write(profile)
@@ -91,11 +96,13 @@ final class ProfileStore {
     func recordJamfMetadata(
         _ metadata: JamfPackageMetadata,
         version: String,
+        packageID: String?,
         for bundleIdentifier: String
     ) {
         guard var profile = profile(for: bundleIdentifier) else { return }
         profile.jamfMetadata = metadata
         profile.jamfMetadataVersion = version
+        profile.jamfPackageID = packageID ?? profile.jamfPackageID
         profile.savedAt = Date()
         write(profile)
     }

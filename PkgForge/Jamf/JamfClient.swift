@@ -389,6 +389,13 @@ actor JamfClient {
         return page.results.first(where: matches)
     }
 
+    /// Fetches one package record. Used to offer the record this app was last
+    /// uploaded to as a replacement target for a new version.
+    func package(id: String) async throws -> JamfPackageSummary? {
+        let data = try await send(method: "GET", path: "api/v1/packages/\(id)")
+        return try? JSONDecoder().decode(JamfPackageSummary.self, from: data)
+    }
+
     private struct CreatedPackage: Decodable {
         let id: String
     }

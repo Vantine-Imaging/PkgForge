@@ -248,6 +248,14 @@ multi-gigabyte package is not held in memory, and a SHA-256 computed during
 that pass is sent with the record. Progress is reported live and the upload can
 be stopped in flight.
 
+After a successful upload PkgForge remembers which record it wrote to, so the
+next version can offer to **repoint that record** rather than only ever adding
+a new one. A new version collides with nothing, so without that there was no
+way to reuse a record — and reusing one is a perfectly normal way to run Jamf,
+since policies scoped to it then need no editing. It defaults to *off*:
+repointing is the destructive choice of the two, and a record per version is
+the more common convention.
+
 Collisions are checked on **both** `fileName` and `packageName` before anything
 is sent. The second is a hard constraint: Jamf Pro requires package display
 names to be unique and rejects the POST with `DUPLICATE_FIELD` otherwise, so

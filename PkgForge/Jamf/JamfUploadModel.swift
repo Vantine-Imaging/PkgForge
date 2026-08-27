@@ -20,9 +20,18 @@ final class JamfUploadModel {
 
     var metadata = JamfPackageMetadata()
     private(set) var phase: Phase = .editing
-    /// Set when a record with the same filename already exists on the server.
+    /// Set when a record on the server collides with this upload — same
+    /// filename, or the same display name Jamf requires to be unique.
     private(set) var duplicate: JamfPackageSummary?
+    /// The record this app was last uploaded to. A new version collides with
+    /// nothing, so without this there is no way to offer to reuse it — and
+    /// repointing one record at each new version is a perfectly normal way to
+    /// run Jamf, since policies then need no editing.
+    private(set) var previousUpload: JamfPackageSummary?
+    /// The record an upload will write to when replacing, whichever applies.
+    var replaceTarget: JamfPackageSummary? { duplicate ?? previousUpload }
     /// When true, the existing record is updated instead of a new one created.
+    /// Set by `checkForDuplicate` once it knows which case applies.
     var replaceExisting = true
 
     /// True when the existing record shares this upload's display name. Jamf Pro
@@ -33,11 +42,17 @@ final class JamfUploadModel {
         return duplicate.packageName == metadata.displayName
     }
 
+    /// True when the only candidate is the record from a previous version, so
+    /// replacing means repointing it rather than overwriting a clash.
+    var replacingPreviousVersion: Bool {
+        duplicate == nil && previousUpload != nil
+    }
+
     /// True when a record matched but points at a different file — replacing it
     /// repoints it at this package.
     var duplicatePointsElsewhere: Bool {
-        guard let duplicate else { return false }
-        return duplicate.fileName != metadata.fileName
+        guard let target = replaceTarget else { return false }
+        return target.fileName != metadata.fileName
     }
 
     var canUpload: Bool {
@@ -147,7 +162,11 @@ final class JamfUploadModel {
 
     /// Looks for a same-named package before offering to upload, so a repeat
     /// build does not silently become a second record.
-    func checkForDuplicate(using client: JamfClient) async {
+    func checkForDuplicate(
+        using client: JamfClient,
+        previousPackageID: String? = nil,
+        previousMetadata: JamfPackageMetadata? = nil
+    ) async {
         phase = .checkingForDuplicate
         do {
             duplicate = try await client.existingPackage(
@@ -157,6 +176,29 @@ final class JamfUploadModel {
         } catch {
             duplicate = nil
         }
+
+        // Only look for the previous record when nothing collides: a collision is
+        // the stronger signal and already provides a replace target.
+        previousUpload = nil
+        if duplicate == nil {
+            if let previousPackageID {
+                previousUpload = try? await client.package(id: previousPackageID)
+            } else if let previousMetadata {
+                // Profiles written before the record id was stored: the previous
+                // upload's own filename and display name still identify it.
+                previousUpload = try? await client.existingPackage(
+                    fileName: previousMetadata.fileName,
+                    packageName: previousMetadata.displayName
+                )
+            }
+        }
+
+        // A collision defaults to replacing, because creating a second record is
+        // what the server refuses. Repointing a previous version's record
+        // defaults to off: it is the destructive option of the two, and adding a
+        // record is what most Jamf setups expect for a new version.
+        replaceExisting = duplicate != nil
+
         phase = .editing
     }
 
@@ -199,8 +241,8 @@ final class JamfUploadModel {
 
         do {
             let packageID: String
-            if let duplicate, replaceExisting {
-                packageID = duplicate.id
+            if let target = replaceTarget, replaceExisting {
+                packageID = target.id
                 // Best-effort: getting the new file onto the distribution point
                 // is the point of this operation, and a rejected metadata
                 // change should not stand in the way of it. Reported, not
@@ -258,6 +300,19 @@ final class JamfUploadModel {
             phase = .failed("\(reason)\n\nAn empty package record was left behind in Jamf Pro (id \(packageID)) and could not be removed automatically — delete it by hand.")
         }
     }
+
+    #if DEBUG
+    /// Test seam: the real path resolves these from the server.
+    func setForTesting(duplicate: JamfPackageSummary?, previousUpload: JamfPackageSummary?) {
+        self.duplicate = duplicate
+        self.previousUpload = previousUpload
+    }
+
+    /// Mirrors what `checkForDuplicate` does once it knows the case.
+    func applyDefaultForTesting() {
+        replaceExisting = duplicate != nil
+    }
+    #endif
 
     func reset() {
         phase = .editing

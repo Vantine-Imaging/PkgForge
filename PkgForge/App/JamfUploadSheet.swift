@@ -225,21 +225,24 @@ struct JamfUploadSheet: View {
             Toggle("Suppress from Dock", isOn: $model.metadata.suppressFromDock)
             Toggle("Suppress updates", isOn: $model.metadata.suppressUpdates)
 
-            if let duplicate = model.duplicate {
+            if let target = model.replaceTarget {
                 VStack(alignment: .leading, spacing: 8) {
                     Label {
-                        Text(model.duplicatePointsElsewhere
-                             ? "A package record named “\(duplicate.packageName)” (id \(duplicate.id)) already exists, pointing at \(duplicate.fileName). Replacing it repoints it at this package."
-                             : "\(duplicate.fileName) already exists on this server as “\(duplicate.packageName)” (id \(duplicate.id)).")
+                        Text(message(for: target))
                     } icon: {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: model.replacingPreviousVersion
+                              ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
                     }
                     .font(.callout)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(model.replacingPreviousVersion ? Color.secondary : Color.orange)
 
                     Picker("", selection: $model.replaceExisting) {
-                        Text("Replace the existing record").tag(true)
-                        Text("Create a second record").tag(false)
+                        Text(model.replacingPreviousVersion
+                             ? "Replace that record with this version"
+                             : "Replace the existing record").tag(true)
+                        Text(model.replacingPreviousVersion
+                             ? "Create a new record for this version"
+                             : "Create a second record").tag(false)
                     }
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
@@ -348,6 +351,16 @@ struct JamfUploadSheet: View {
         .padding(16)
     }
 
+    private func message(for target: JamfPackageSummary) -> String {
+        if model.replacingPreviousVersion {
+            return "This app was last uploaded to “\(target.packageName)” (id \(target.id)), which points at \(target.fileName). Replacing it repoints that record and leaves policies scoped to it untouched."
+        }
+        if model.duplicatePointsElsewhere {
+            return "A package record named “\(target.packageName)” (id \(target.id)) already exists, pointing at \(target.fileName). Replacing it repoints it at this package."
+        }
+        return "\(target.fileName) already exists on this server as “\(target.packageName)” (id \(target.id))."
+    }
+
     // MARK: Actions
 
     /// Opens Settings on the Jamf Pro tab. `openSettings()` on its own reopens
@@ -376,15 +389,20 @@ struct JamfUploadSheet: View {
 
     private func refreshDuplicate() async {
         guard let client = jamf.client, isConnectedToSelection else { return }
-        await model.checkForDuplicate(using: client)
+        await model.checkForDuplicate(
+            using: client,
+            previousPackageID: controller.savedJamfPackageID,
+            previousMetadata: controller.savedJamfMetadata
+        )
     }
 
     private func upload() async {
         guard let client = jamf.client else { return }
         await model.upload(using: client)
-        if case .finished = model.phase {
-            // Remember the metadata so the next build of this app starts from it.
-            controller.rememberJamfMetadata(model.metadata)
+        if case .finished(let packageID) = model.phase {
+            // Remember the metadata and which record it went to, so the next
+            // version can offer to reuse that record.
+            controller.rememberJamfMetadata(model.metadata, packageID: packageID)
         }
     }
 }

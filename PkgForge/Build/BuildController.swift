@@ -298,11 +298,18 @@ final class BuildController {
         return PackageBuilder.version(fromPackageFileName: fileName, bundle: bundle)
     }
 
-    func rememberJamfMetadata(_ metadata: JamfPackageMetadata) {
+    /// The record this app was last uploaded to, if any.
+    var savedJamfPackageID: String? {
+        guard let bundle else { return nil }
+        return profiles.profile(for: bundle.bundleIdentifier)?.jamfPackageID
+    }
+
+    func rememberJamfMetadata(_ metadata: JamfPackageMetadata, packageID: String?) {
         guard let bundle else { return }
         profiles.recordJamfMetadata(
             metadata,
             version: configuration.version,
+            packageID: packageID,
             for: bundle.bundleIdentifier
         )
     }
