@@ -67,6 +67,15 @@ struct GeneralSettings: View {
                 Toggle("Always install to the location above", isOn: $defaults.template.preventRelocation)
                 Toggle("Abort the install if the app cannot be stopped", isOn: $defaults.template.abortIfRunning)
                 Toggle("Remove stray copies found elsewhere on disk", isOn: $defaults.template.removeStrayCopies)
+
+                Toggle("Notarize with Apple after building", isOn: $defaults.template.notarize)
+
+                LabeledContent("Notary Profile") {
+                    TextField("Profile name", text: $defaults.template.notaryProfile)
+                        .textFieldStyle(.roundedBorder)
+                        .labelsHidden()
+                }
+                .help("The notarytool keychain profile name, from xcrun notarytool store-credentials.")
             } header: {
                 Text("Defaults for New Apps")
             } footer: {

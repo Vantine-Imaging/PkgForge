@@ -7,14 +7,14 @@
 #
 # Once a "Developer ID Application" identity exists in the keychain it is used
 # automatically; likewise "Developer ID Installer" for the pkg, and a
-# notarytool keychain profile (default name: pkgforge-notary) for notarization
-# + stapling. One-time setup lives in README.md.
+# notarytool keychain profile (default name: vantine-notary-1, override with
+# NOTARY_PROFILE=...) for notarization + stapling. One-time setup lives in README.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="PkgForge"
 IDENTIFIER="com.vantine.PkgForge"
-NOTARY_PROFILE="${NOTARY_PROFILE:-pkgforge-notary}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-vantine-notary-1}"
 
 # Resolves a signing identity to its SHA-1 fingerprint, preferring the one that
 # expires last.
