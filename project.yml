@@ -24,7 +24,7 @@ targets:
         # CFBundleVersion to increase for every build it sees, and updaters
         # compare on it. Set from `git rev-list --count HEAD` when bumping, so
         # there is a mechanical way to get the next one right.
-        CURRENT_PROJECT_VERSION: 16
+        CURRENT_PROJECT_VERSION: 18
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: com.vantine.PkgForge
